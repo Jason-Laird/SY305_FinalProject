@@ -17,82 +17,101 @@ int main() {
     pid_t cliFork;
     cliFork= fork();
     if (0==cliFork){
+            char *ip = "10.60.117.216";
+    int port = PORT;
 
-    }
-    while (1){
+    int sockfd;
+    struct sockaddr_in addr;
+    char buffer[2];
+    socklen_t addr_size; 
 
-    }
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    memset(&addr, 0, sizeof(addr));
 
-    // ----------------------
-    // Create a TCP socket
-    // ----------------------
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);  // AF_INET = IPv4, SOCK_STREAM = TCP
-    if (server_fd < 0) {
-        perror("socket failed");                 // Print error message
-        exit(EXIT_FAILURE);                      // Exit program
-    }
-    // ----------------------
-    // Configure server address
-    // ----------------------
-    memset(&server_addr, 0, sizeof(server_addr)); // Clear structure (optional but good practice)
-    server_addr.sin_family = AF_INET;             // Set address family to IPv4
-    server_addr.sin_addr.s_addr = INADDR_ANY;     // Bind to all available network interfaces
-    server_addr.sin_port = htons(PORT);           // Convert port number to network byte order
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr(ip);
 
-    // ----------------------
-    // Bind socket to the address and port
-    // ----------------------
-    if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        perror("bind failed");
-        close(server_fd);
-        exit(EXIT_FAILURE);
-    }
 
-    // ----------------------
-    // Begin listening for incoming connections
-    // ----------------------
-    if (listen(server_fd, 5) < 0) {               // '5' = max number of queued connections
-        perror("listen failed");
-        close(server_fd);
-        exit(EXIT_FAILURE);
-    }
+    while (1) {
 
-    printf("Server listening on port %d...\n", PORT);
+        char choice;
+        printf("Enter D or E for payload: ");
+        scanf(" %c", buffer);        // Send correct length
+        sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, sizeof(addr));
 
-    // ----------------------
-    // Accept a client connection
-    // ----------------------
-    client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
-    if (client_fd < 0) {
-        perror("accept failed");
-        close(server_fd);
-        exit(EXIT_FAILURE);
-    }
+        bzero(buffer,sizeof(buffer));
 
-    printf("Client connected.\n");
-
-    // ----------------------
-    // Read data from the client
-    // ----------------------
-    int bytes = read(client_fd, buffer, BUFFER_SIZE - 1);  // Read up to 1023 bytes
-    if (bytes < 0) {
-        perror("read failed");
     } else {
-        buffer[bytes] = '\0';              // Null-terminate received data
-        printf("Received: %s\n", buffer);  // Print the message sent by the client
+        // ----------------------
+        // Create a TCP socket
+        // ----------------------
+        server_fd = socket(AF_INET, SOCK_STREAM, 0);  // AF_INET = IPv4, SOCK_STREAM = TCP
+        if (server_fd < 0) {
+            perror("socket failed");                 // Print error message
+            exit(EXIT_FAILURE);                      // Exit program
+        }
+        // ----------------------
+        // Configure server address
+        // ----------------------
+        memset(&server_addr, 0, sizeof(server_addr)); // Clear structure (optional but good practice)
+        server_addr.sin_family = AF_INET;             // Set address family to IPv4
+        server_addr.sin_addr.s_addr = INADDR_ANY;     // Bind to all available network interfaces
+        server_addr.sin_port = htons(PORT);           // Convert port number to network byte order
 
         // ----------------------
-        // Send a response back to the client
+        // Bind socket to the address and port
         // ----------------------
-        const char* message = "Hello from server!\n";
-        write(client_fd, message, strlen(message));  // Send message to client
+        if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+            perror("bind failed");
+            close(server_fd);
+            exit(EXIT_FAILURE);
+        }
+
+        // ----------------------
+        // Begin listening for incoming connections
+        // ----------------------
+        if (listen(server_fd, 5) < 0) {               // '5' = max number of queued connections
+            perror("listen failed");
+            close(server_fd);
+            exit(EXIT_FAILURE);
+        }
+
+        printf("Server listening on port %d...\n", PORT);
+
+        // ----------------------
+        // Accept a client connection
+        // ----------------------
+        client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
+        if (client_fd < 0) {
+            perror("accept failed");
+            close(server_fd);
+            exit(EXIT_FAILURE);
+        }
+
+        printf("Client connected.\n");
+
+        // ----------------------
+        // Read data from the client
+        // ----------------------
+        int bytes = read(client_fd, buffer, BUFFER_SIZE - 1);  // Read up to 1023 bytes
+        if (bytes < 0) {
+            perror("read failed");
+        } el(client_fd);   // Close connection with client
+        close(server_fd);   // Close the listening socket
+se {
+            buffer[bytes] = '\0';              // Null-terminate received data
+            printf("Received: %s\n", buffer);  // Print the message sent by the client
+
+        }
+
+        // ----------------------
+        // Close sockets
+        // ----------------------
+        close(client_fd);   // Close connection with client
+        close(server_fd);   // Close the listening socket
+
+
     }
-
-    // ----------------------
-    // Close sockets
-    // ----------------------
-    close(client_fd);   // Close connection with client
-    close(server_fd);   // Close the listening socket
-
     return 0;           // Exit program successfully
-}
+}}

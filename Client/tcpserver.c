@@ -4,14 +4,24 @@
 #include <unistd.h>         // For read, write, close
 #include <arpa/inet.h>      // For sockaddr_in, inet functions, htons
 
-#define PORT 8080           // Port number the server will listen on
-#define BUFFER_SIZE 1024    // Size of buffer for incoming messages
+#define PORT 5001          // Port number the server will listen on
+#define BUFFER_SIZE 512    // Size of buffer for incoming messages
+
 
 int main() {
     int server_fd, client_fd;                  // File descriptors for server and client sockets
     struct sockaddr_in server_addr, client_addr;  // Structures to hold address information
     socklen_t client_len = sizeof(client_addr);   // Length of client address struct
     char buffer[BUFFER_SIZE];                  // Buffer to store data received from client
+
+    pid_t cliFork;
+    cliFork= fork();
+    if (0==cliFork){
+
+    }
+    while (1){
+
+    }
 
     // ----------------------
     // Create a TCP socket
@@ -21,7 +31,6 @@ int main() {
         perror("socket failed");                 // Print error message
         exit(EXIT_FAILURE);                      // Exit program
     }
-
     // ----------------------
     // Configure server address
     // ----------------------

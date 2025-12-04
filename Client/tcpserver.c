@@ -42,7 +42,8 @@ int main() {
 
         bzero(buffer,sizeof(buffer));
 
-    } else {
+    } 
+    }else{
         // ----------------------
         // Create a TCP socket
         // ----------------------
@@ -51,6 +52,7 @@ int main() {
             perror("socket failed");                 // Print error message
             exit(EXIT_FAILURE);                      // Exit program
         }
+    }
         // ----------------------
         // Configure server address
         // ----------------------
@@ -96,10 +98,10 @@ int main() {
         // ----------------------
         int bytes = read(client_fd, buffer, BUFFER_SIZE - 1);  // Read up to 1023 bytes
         if (bytes < 0) {
-            perror("read failed");
-        } el(client_fd);   // Close connection with client
-        close(server_fd);   // Close the listening socket
-se {
+        perror("read failed");
+        } else{
+            (client_fd);   // Close connection with client
+            close(server_fd);   // Close the listening socket
             buffer[bytes] = '\0';              // Null-terminate received data
             printf("Received: %s\n", buffer);  // Print the message sent by the client
 
@@ -111,7 +113,6 @@ se {
         close(client_fd);   // Close connection with client
         close(server_fd);   // Close the listening socket
 
-
-    }
-    return 0;           // Exit program successfully
-}}
+        
+        return 0; 
+    }        // Exit program successfully

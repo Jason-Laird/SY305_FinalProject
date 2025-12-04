@@ -9,6 +9,7 @@
 #include <wait.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "payload.h"
 
 
 unsigned int payload_len = sizeof(payload.h);

